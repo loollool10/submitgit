@@ -2,9 +2,10 @@ package controllers
 
 import javax.inject.Inject
 
-import com.madgag.github.RepoId
+import com.madgag.github.{PullRequestId, RepoId}
 import lib._
-import lib.model.MessageSummary
+import lib.model.PRMessageIdFinder.messageIdsByMostRecentUsageIn
+import lib.model.{PRMessageIdFinder, MessageSummary}
 import play.api.cache.Cached
 import play.api.libs.json.Json._
 import play.api.mvc._
@@ -16,13 +17,24 @@ class Api @Inject() (cached: Cached) extends Controller {
 
   def messageLookup(repoId: RepoId, query: String) = cached(s"$repoId $query") {
     Action.async {
-      val archives = Project.byRepoId(repoId).mailingList.archives
       for {
-        messagesOpt <- Future.find(archives.map(_.lookupMessage(query)))(_.nonEmpty)
-      } yield Ok(toJson(messagesOpt.toSeq.flatten: Seq[MessageSummary]))
+        messagesOpt <- Project.byRepoId(repoId).mailingList.lookupMessage(query)
+      } yield Ok(toJson(messagesOpt: Seq[MessageSummary]))
     }
   }
 
+  def pullRequestMessages(prId: PullRequestId) = cached(s"$prId messages") {
+    Action.async {
+      val pr = Bot.conn().getRepository(prId.repo.fullName).getPullRequest(prId.num)
+      val mailingList = Project.byRepoId(prId.repo).mailingList
+
+      val messageIds = messageIdsByMostRecentUsageIn(pr)
+      println(messageIds)
+      for {
+        messages <- Future.traverse(messageIds.take(3))(mailingList.lookupMessage)
+      } yield Ok(toJson(messages.flatten: Seq[MessageSummary]))
+    }
+  }
 }
 
 

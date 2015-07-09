@@ -54,13 +54,14 @@
         inReplyToFieldContainer.messageIdPicker({
             hint: true,
             highlight: true,
-            minLength: 3,
+            minLength: 0, // To allow default suggestions
             classNames: {menu: 'tt-dropdown-menu'}
         }, {
             name: 'messageIds',
             source: new Bloodhound({
                 datumTokenizer: Bloodhound.tokenizers.obj.whitespace('value'),
                 queryTokenizer: Bloodhound.tokenizers.whitespace,
+                prefetch: '@routes.Api.pullRequestMessages(req.pr.id)',
                 remote: {
                     url: '@routes.Api.messageLookup(req.repo.id, "QUERY_STRING")',
                     wildcard: 'QUERY_STRING'
